@@ -1,0 +1,20 @@
+/* =========================================================================
+ * GEARSENSE - BOOTSTRAP 5 STYLES
+ * ========================================================================= */
+
+/* Theme Utilities for Gearsense */
+.bg-gear-teal {
+  background-color: #0d8a7c;
+}
+.bg-gear-dark-teal {
+  background-color: #097266;
+}
+.bg-gear-surface {
+  background-color: #f0fdfa;
+}
+.border-gear-teal {
+  border-color: #14b8a6;
+}
+.text-gear-teal {
+  color: #0d8a7c;
+}
