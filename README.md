@@ -1,64 +1,197 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# ⚙️ GEARSENSE: IoT & Edge-AI Gear Vibration Monitoring System
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+[![Laravel](https://img.shields.io/badge/Laravel-10.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
+[![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
+[![ESP32](https://img.shields.io/badge/Hardware-ESP32-E7352C?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/)
+[![Sensor](https://img.shields.io/badge/Sensor-ADXL345-0071C5?style=for-the-badge)](https://www.analog.com/)
+[![Telegram](https://img.shields.io/badge/Alerts-Telegram_Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://telegram.org)
+[![Standard](https://img.shields.io/badge/Standard-ISO_10816--3-059669?style=for-the-badge)](#standar-evaluasi-getaran-iso-10816-3)
 
-## About Laravel
+**GEARSENSE** adalah sistem pemantauan kondisi getaran roda gigi (*Condition-Based Monitoring & Predictive Maintenance*) pada transmisi konveyor berbasis **Internet of Things (IoT)** dan **Edge Computing**. Sistem ini memanfaatkan mikrokontroler **ESP32** dan sensor akselerometer tri-aksial **ADXL345** untuk mendeteksi getaran, mengekstraksi fitur statistik domain waktu, mengklasifikasi kondisi transmisi roda gigi secara *real-time*, serta mengirimkan peringatan dini anomali melalui **Bot Telegram**.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 🌟 Fitur Utama Sistem
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. **Edge Feature Extraction pada Mikrokontroler ESP32:**
+   - Ekstraksi parameter statistik getaran secara lokal pada mikrokontroler: *RMS (Root Mean Square)*, *Peak-to-Peak (P2P)*, *Wilson Amplitude (WAMP)*, *Kurtosis*, dan *Skewness*.
+   - Filter gravitasi dinamis (eliminasi komponen statis 1G sumbu Z) untuk memperoleh getaran murni mekanis transmisi.
+2. **Klasifikasi Kondisi Berbasis Standar & Logika Inferensi:**
+   - Mengelompokkan kondisi operasi roda gigi menjadi 3 tingkatan status:
+     - 🟢 **NORMAL (Zona A):** Kondisi transmisi optimal, getaran rendah ($Z_{\text{RMS}} < 0.06\text{ g}$, $P2P_Z < 0.12\text{ g}$).
+     - 🟡 **SCORING / TERKIKIS (Zona B/C):** Peringatan keausan / erosi permukaan gigi ($0.06\text{ g} \le Z_{\text{RMS}} < 0.12\text{ g}$ atau $P2P_Z \ge 0.12\text{ g}$). Rekomendasi pelumasan CBM.
+     - 🔴 **DAMAGED / RUSAK KRITIS (Zona D):** Kerusakan retak / patah gigi transmisi ($Z_{\text{RMS}} \ge 0.12\text{ g}$ atau $P2P_Z \ge 0.30\text{ g}$). Konveyor harus segera dihentikan.
+3. **Dashboard Web Telemetri Real-Time:**
+   - **Dashboard Utama:** Ringkasan KPI konveyor, status konektivitas IoT, metrik getaran tri-aksial, dan rekomendasi preskriptif CBM.
+   - **Live Monitoring:** Osiloskop digital streaming data getaran 50 Hz, tabel klasifikasi *live*, dan indikator anomali.
+   - **Riwayat Pengukuran:** Grafik tren fluktuasi historis 24 jam dengan batas acuan **ISO 10816-3** ($0.10\text{ g}$ Waspada & $0.15\text{ g}$ Bahaya), filter tabel cerdas, dan ekspor data CSV.
+4. **Early Warning System (EWS) Bot Telegram:**
+   - Otomasi pengiriman pesan peringatan instan ke akun atau grup teknisi saat insiden getaran abnormal terjadi.
+   - Dilengkapi sistem *debounce cooldown* (30 detik) guna mencegah *spamming* dan *rate-limit* Telegram API.
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 🏗️ Arsitektur Sistem
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```text
+  ┌─────────────────────────────────────────────────────────────┐
+  │                 TRANSMISI RODA GIGI KONVEYOR                │
+  └──────────────────────────────┬──────────────────────────────┘
+                                 │ Getaran Mekanis
+                                 ▼
+                     ┌───────────────────────┐
+                     │ Sensor ADXL345 (I2C)  │
+                     └───────────┬───────────┘
+                                 │ 50 - 200 Hz Tri-Axial
+                                 ▼
+                     ┌───────────────────────┐
+                     │ Node ESP32 (Edge AI)  │
+                     │ • Fitur Statistik     │
+                     │ • Deteksi Anomali     │
+                     └───────────┬───────────┘
+                                 │ HTTP POST JSON (WiFi)
+                                 ▼
+                ┌───────────────────────────────────┐
+                │       SERVER WEB GEARSENSE        │
+                │  • Laravel 10 Backend & REST API  │
+                │  • Database MySQL / Telemetri     │
+                │  • Dashboard Real-Time (Chart.js) │
+                └─────────┬───────────────┬─────────┘
+                          │               │
+        Alert Notifikasi  │               │ Visualisasi Data
+                          ▼               ▼
+                ┌──────────────────┐    ┌──────────────────┐
+                │   BOT TELEGRAM   │    │  BROWSER CLIENT  │
+                │  (@pata77_bot)   │    │ (PC / Smartphone)│
+                └──────────────────┘    └──────────────────┘
+```
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+## 🔌 Skema Wiring Hardware (ESP32 ke ADXL345)
 
-### Premium Partners
+Komunikasi antara ESP32 dan ADXL345 menggunakan protokol **I2C Fast Mode (400 kHz)** pada alamat default **`0x53`**:
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+| Pin ADXL345 | Pin ESP32 (DOIT V1) | Keterangan |
+| :--- | :--- | :--- |
+| **VCC** | **3.3V** | Tegangan operasi modul ADXL345 (Gunakan 3.3V) |
+| **GND** | **GND** | Ground bersama |
+| **CS** | **3.3V** | Mengaktifkan mode komunikasi I2C |
+| **SDO** | **GND** | Mengatur alamat I2C ke `0x53` |
+| **SDA** | **GPIO 21 (D21)** | Jalur Data Serial I2C |
+| **SCL** | **GPIO 22 (D22)** | Jalur Clock Serial I2C |
 
-## Contributing
+> Panduan fisik wiring selengkapnya tersedia di: [`firmware/PANDUAN_HARDWARE_IOT.md`](firmware/PANDUAN_HARDWARE_IOT.md).
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## 💻 Panduan Instalasi & Menjalankan Web
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 1. Prasyarat Sistem
+* PHP >= 8.1 dengan ekstensi `pdo_mysql`, `curl`, `mbstring`, `openssl`
+* Composer 2.x
+* Database Server (MySQL / MariaDB via XAMPP / Laragon)
 
-## Security Vulnerabilities
+### 2. Kloning Repositori
+```bash
+git clone https://github.com/fathanmubarak2/gearsense.git
+cd gearsense
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 3. Instal Dependensi
+```bash
+composer install
+```
 
-## License
+### 4. Konfigurasi Lingkungan (`.env`)
+Salin file template `.env.example` menjadi `.env`:
+```bash
+cp .env.example .env
+```
+Sesuaikan konfigurasi database dan timezone pada file `.env`:
+```env
+APP_NAME=GearSense
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://localhost:8000
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=gearsense_db
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+### 5. Generate Application Key & Migrasi Database
+```bash
+php artisan key:generate
+php artisan migrate --seed
+```
+
+### 6. Jalankan Server Web
+```bash
+php artisan serve --host=0.0.0.0 --port=8000
+```
+Buka browser pada: `http://localhost:8000` (atau IP laptop Anda pada jaringan lokal).
+
+---
+
+## 🚀 Panduan Pengunggahan Firmware ESP32
+
+1. Buka aplikasi **Arduino IDE**.
+2. Buka berkas: [`firmware/gearsense_firmware.ino`](firmware/gearsense_firmware.ino).
+3. Pastikan *library* berikut telah terinstal pada Library Manager:
+   * `Adafruit ADXL345` (oleh Adafruit)
+   * `Adafruit Unified Sensor` (oleh Adafruit)
+   * `ArduinoJson` (oleh Benoit Blanchon, v6.x)
+4. Sesuaikan konstanta koneksi pada bagian atas kode:
+   ```cpp
+   const char* WIFI_SSID     = "NAMA_WIFI_ATAU_HOTSPOT_ANDA";
+   const char* WIFI_PASSWORD = "PASSWORD_WIFI_ANDA";
+   const char* SERVER_BASE_URL = "http://192.168.1.XXX:8000"; // IP Laptop Anda
+   ```
+5. Pilih Board: **ESP32 Dev Module** dan Port COM yang sesuai.
+6. Klik **Upload**. Pantau proses melalui Serial Monitor (Baud Rate: `115200`).
+
+---
+
+## 📡 Dokumentasi Endpoint Telemetri Sensor
+
+* **Endpoint:** `POST /api/telemetry`
+* **Format:** `application/json`
+* **Contoh Payload:**
+```json
+{
+  "node_code": "ESP32-GEARSENSE-01",
+  "raw_x": 0.045,
+  "raw_y": -0.012,
+  "raw_z": 0.985,
+  "p2p_x": 0.082,
+  "p2p_y": 0.065,
+  "p2p_z": 0.098,
+  "wamp_z": 0.040,
+  "wamp_y": 0.020,
+  "rms_z": 0.018,
+  "kurtosis_z": 3.12,
+  "skewness_z": 0.15,
+  "condition": "NORMAL",
+  "confidence_score": 98.4,
+  "fis_score": 14.5,
+  "sampling_rate_hz": 200
+}
+```
+
+---
+
+## 🎓 Atribusi Akademik & Pengembang
+
+Projek ini dikembangkan sebagai bagian dari penelitian tugas akhir / skripsi:
+* **Institusi:** Program Studi Informatika / Teknik Informatika, Fakultas Teknologi Informasi, Universitas YARSI.
+* **Fokus Penelitian:** Sistem Monitoring Getaran Roda Gigi dan Klasifikasi Kerusakan Transmisi Konveyor Berbasis IoT (*Condition-Based Monitoring & Predictive Maintenance*).
+
+---
+
+## 📄 Lisensi
+
+Projek ini dilisensikan di bawah lisensi [MIT License](LICENSE).
